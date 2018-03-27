@@ -62,6 +62,7 @@ mainc(void)
   cinit();
   sti();           // enable inturrupts
   userinit();      // first user process
+  shmeminit();     // on boot, calls initialize sharred memory function
   scheduler();     // start running processes
 }
 

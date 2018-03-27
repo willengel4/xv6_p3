@@ -9,6 +9,9 @@
 extern char data[];  // defined in data.S
 
 static pde_t *kpgdir;  // for use in scheduler()
+#define SHMEM_PAGES (4)
+int shmem_counts[SHMEM_PAGES];
+void *shmem_addr[SHMEM_PAGES];
 
 // Allocate one page table for the machine for the kernel address
 // space for scheduler processes.
@@ -231,7 +234,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   char *mem;
   uint a;
 
-  if(newsz > USERTOP)
+  if(newsz > (USERTOP - ((proc->shmem + 1) * PGSIZE)))
     return 0;
   if(newsz < oldsz)
     return oldsz;
@@ -286,12 +289,22 @@ freevm(pde_t *pgdir)
 
   if(pgdir == 0)
     panic("freevm: no pgdir");
-  deallocuvm(pgdir, USERTOP, 0);
+
+  deallocuvm(pgdir, USERTOP - ((proc->shmem+1) * PGSIZE), 0);
+  
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P)
       kfree((char*)PTE_ADDR(pgdir[i]));
   }
   kfree((char*)pgdir);
+
+  for(i = 0; i < 4; i++)
+  {
+    if(proc->shmem_child[i] != NULL)
+    {
+      shmem_counts[i]--;
+    }
+  }
 }
 
 // Given a parent process's page table, create a copy
@@ -306,7 +319,7 @@ copyuvm(pde_t *pgdir, uint sz)
 
   if((d = setupkvm()) == 0)
     return 0;
-  for(i = 0; i < sz; i += PGSIZE){
+  for(i = 4096; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void*)i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
@@ -318,6 +331,15 @@ copyuvm(pde_t *pgdir, uint sz)
     if(mappages(d, (void*)i, PGSIZE, PADDR(mem), PTE_W|PTE_U) < 0)
       goto bad;
   }
+
+  for(i = 0; i < 4; i++)
+  {
+    if(proc->shmems[i] != NULL)
+    {
+      shmem_counts[i]++;
+    }
+  }
+
   return d;
 
 bad:
@@ -363,4 +385,50 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
     va = va0 + PGSIZE;
   }
   return 0;
+}
+
+void shmeminit(void)
+{
+  int i;
+  for(i = 0; i < SHMEM_PAGES; i++)
+  {
+    shmem_counts[i] = 0;
+    if((shmem_addr[i] = kalloc()) == 0)
+    {
+      panic("shmeminit failed");
+    }
+  }
+}
+
+int shmem_count(int page_number)
+{
+  if(page_number < 0 || page_number >= SHMEM_PAGES)
+    return -1;
+  
+  return shmem_counts[page_number];
+}
+
+void* shmem_access(int page_number)
+{
+  if(page_number < 0 || page_number >= SHMEM_PAGES)
+    return NULL;
+
+  if(proc->shmems[page_number] != NULL)
+  {
+    return proc->shmems[page_number];
+  }
+
+  void *tomap = (void *) (USERTOP - ((proc->shmem + 1) * PGSIZE));
+
+  if(proc->sz >= (int)tomap)
+    return NULL;
+
+  if( mappages(proc->pgdir, tomap, PGSIZE, PADDR(shmem_addr[page_number]), PTE_W|PTE_U) < 0 )
+    return NULL;
+
+  proc->shmem++;
+  shmem_counts[page_number]++;
+  proc->shmems[page_number] = tomap;
+
+  return tomap;
 }

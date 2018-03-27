@@ -68,6 +68,13 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  p->shmem = 0;
+  int i;
+  for(i = 0; i < 4; i++)
+  {
+    p->shmems[i] = NULL;
+  }
+
   return p;
 }
 
@@ -156,6 +163,13 @@ fork(void)
   pid = np->pid;
   np->state = RUNNABLE;
   safestrcpy(np->name, proc->name, sizeof(proc->name));
+
+  np->shmem = proc->shmem;
+  for(i = 0; i < 4; i++)
+  {
+    np->shmems[i] = proc->shmems[i];
+  }
+
   return pid;
 }
 
@@ -223,6 +237,13 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
+
+        int k;
+        for(k = 0; k < 4; k++)
+        {
+          proc->shmem_child[k] = proc->shmems[k];
+        }
+
         freevm(p->pgdir);
         p->state = UNUSED;
         p->pid = 0;
