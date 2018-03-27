@@ -4,6 +4,10 @@
 
 #define PGSIZE 4096
 
+/* Tests the shared memory functionality.
+ * Starts out by trying to access invalid shared pages
+ *  these tests should return null
+ * Then, tests out writing to shared memory and reading back from it */
 int main(int argc, char * argv[])
 {
     void *ptr;
@@ -95,6 +99,37 @@ int main(int argc, char * argv[])
         }
     }
 
+    void *ptr3;
+    ptr3 = shmem_access(3);
+    if(ptr3 == NULL)
+    {
+        printf(1, "test failed\n");
+        exit();   
+    }
 
+    int pid = fork();
+    if(pid < 0)
+    {
+        printf(1, "test failed\n");
+        exit(); 
+    }
+    else if(pid == 0)
+    {
+        void *ptr4;
+        ptr4 = shmem_access(3);
+        if(ptr4 == NULL)
+        {
+            printf(1, "test failed\n");
+            exit(); 
+        }
+
+        if(ptr3 != ptr4)
+        {
+            printf(1, "test failed\n");
+            exit(); 
+        }
+    }
+
+    printf(1, "Passed all tests\n");
     exit();
 }

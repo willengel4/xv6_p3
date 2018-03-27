@@ -168,7 +168,9 @@ pde_t*          copyuvm(pde_t*, uint);
 void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
-void            shmeminit(void); //to make it callable from elsewhere
+
+/* For calling the shared memory functions throughout xv6 */
+void            shmeminit(void); 
 int             shmem_count(int);
 void*           shmem_access(int);
 

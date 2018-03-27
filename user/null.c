@@ -1,6 +1,9 @@
 #include "types.h"
 #include "user.h"
 
+/* Tester for null dereference.
+ * It tries to dereference a null pointer.
+ * If it fails, it passes */
 int main(int argc, char * argv[])
 {
     int *p = 0;
